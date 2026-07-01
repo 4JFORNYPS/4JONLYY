@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級聯絡簿試算表雲端系統 (Supabase 終極穩定版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="sync-overlay" class="overlay">
+        <div class="text-2xl font-bold text-slate-700 animate-pulse mb-4">
+            ⚡ 正在與 Supabase 雲端資料庫進行跨平台同步...
+        </div>
+        <div class="text-sm text-gray-500">請稍候，系統正在為您下載最新班級資料</div>
+    </div>
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6 space-y-8">
+        
+        <div class="border-b pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-slate-800 flex items-center gap-2">
+                    📝 班級聯絡簿雲端系統
+                </h1>
+                <p class="text-gray-500 text-sm mt-1">跨平台、跨載具即時同步（免登入直接管理版）</p>
+            </div>
+            <div id="conn-status" class="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 rounded-full font-medium">
+                🔄 雲端連線初始化中...
+            </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+            <h2 class="text-lg font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                👥 學生名冊設定
+            </h2>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse bg-white rounded-lg overflow-hidden shadow-sm">
+                    <thead>
+                        <tr class="bg-slate-700 text-white text-sm">
+                            <th class="p-3 w-24 text-center">座號</th>
+                            <th class="p-3">姓名</th>
+                            <th class="p-3 w-24 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-tbody">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-3">
+                <button onclick="addStudentRow('', '')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+                    ➕ 增加學生欄位
+                </button>
+                <button onclick="saveToCloud()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md transition cursor-pointer">
+                    💾 儲存名冊與設定至雲端
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <h2 class="text-lg font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                📅 今日作業與聯絡事項
+            </h2>
+            <textarea id="homework-content" class="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="請輸入今天的作業或公告事項...例如：&#10;1. 國語習作第十課&#10;2. 數學隨堂演練P.45&#10;3. 明天帶泳衣"></textarea>
+            <div class="mt-3 text-right">
+                <button onclick="saveToCloud()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-md transition cursor-pointer">
+                    💾 儲存今日作業至雲端
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // 🚨 老師請注意：請在此處填入妳的專屬網址與金鑰
+        // ==========================================
+        const SUPABASE_URL = "https://kqbgxpezbmjefpqqibdx.supabase.co/rest/v1/"; // 貼上妳的 Supabase URL
+        const SUPABASE_KEY = "sb_publishable_wYifC2FOpCyIyWiDfpQg1g_tZFYVvoc"; // 貼上妳的 Anon Key
+
+        // 預設名單（當雲端全空時的防呆備份）
+        const defaultData = {
+            students: [
+                { no: "1", name: "陳小明" },
+                { no: "2", name: "林大同" },
+                { no: "3", name: "張美麗" }
+            ],
+            homework: "1. 國語習作第八課\n2. 數學習作P.24-P.25\n3. 簽到簿記號"
+        };
+
+        // 網頁開場自動載入
+        window.onload = async function() {
+            await loadFromCloud();
+        };
+
+        // === 1. 從 Supabase 讀取資料 (跨載具核心) ===
+        async function loadFromCloud() {
+            const statusEl = document.getElementById('conn-status');
+            const overlayEl = document.getElementById('sync-overlay');
+
+            try {
+                // 使用絕對安全的全表查詢，避免 eq 語法出錯
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/kv_store?select=value`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('網路回應不正確');
+                
+                const rows = await response.json();
+                
+                // 讀取成功後的渲染邏輯
+                if (rows && rows.length > 0 && rows[0].value) {
+                    // 雲端有資料，解析並帶入
+                    const cloudData = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+                    renderData(cloudData);
+                    statusEl.innerText = "🟢 雲端同步成功 (已同步最新資料)";
+                    statusEl.className = "bg-emerald-100 text-emerald-800 text-xs px-3 py-1.5 rounded-full font-medium";
+                } else {
+                    // 雲端是空的，載入預設值
+                    renderData(defaultData);
+                    statusEl.innerText = "🟡 雲端目前無資料 (已載入預設範本)";
+                    statusEl.className = "bg-blue-100 text-blue-800 text-xs px-3 py-1.5 rounded-full font-medium";
+                }
+            } catch (error) {
+                console.error("讀取失敗:", error);
+                // 發生錯誤時依然讓老師可以用，使用本機預設
+                renderData(defaultData);
+                statusEl.innerText = "🔴 連線失敗 (目前為離線模式)";
+                statusEl.className = "bg-rose-100 text-rose-800 text-xs px-3 py-1.5 rounded-full font-medium";
+            } finally {
+                // 關閉灰色遮罩，讓老師操作
+                overlayEl.style.display = 'none';
+            }
+        }
+
+        // === 2. 將資料打包儲存至 Supabase (跨載具核心) ===
+        async function saveToCloud() {
+            const statusEl = document.getElementById('conn-status');
+            
+            // 顯示儲存中狀態
+            statusEl.innerText = "⏳ 正在同步至 Supabase 雲端...";
+            statusEl.className = "bg-amber-100 text-amber-800 text-xs px-3 py-1.5 rounded-full font-medium";
+
+            // 抓取目前畫面上所有的學生資料
+            const students = [];
+            const rows = document.querySelectorAll('.student-row');
+            rows.forEach(row => {
+                const no = row.querySelector('.student-no').value.trim();
+                const name = row.querySelector('.student-name').value.trim();
+                if (no || name) {
+                    students.push({ no, name });
+                }
+            });
+
+            // 抓取目前畫面上的作業內容
+            const homework = document.getElementById('homework-content').value;
+
+            // 打包成單一 JSON 物件
+            const payload = {
+                id: "main_data", // 固定主要 ID
+                value: { students, homework }
+            };
+
+            try {
+                // 使用 POST 加上 Prefer: resolution=merge (即 Upsert 動作：有舊資料就覆蓋，沒資料就新增)
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/kv_store`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge' // 核心：使 POST 具備 Upsert 覆蓋功能
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(errText);
+                }
+
+                statusEl.innerText = "🟢 變更已成功同步至雲端！";
+                statusEl.className = "bg-emerald-100 text-emerald-800 text-xs px-3 py-1.5 rounded-full font-medium";
+                alert("✨ 資料已成功即時同步至 Supabase 雲端！跨平台更新完成！");
+                
+            } catch (error) {
+                console.error("儲存失敗:", error);
+                statusEl.innerText = "🔴 儲存失敗，請檢查 RLS Policy 權限設定";
+                statusEl.className = "bg-rose-100 text-rose-800 text-xs px-3 py-1.5 rounded-full font-medium";
+                alert("❌ 儲存失敗！\n提示：請確認您的 Supabase 後台 kv_store 資料表是否確實新增了 allow-all 的政策（Policy），並允許了 INSERT 與 UPDATE 操作。");
+            }
+        }
+
+        // === 3. 畫面渲染輔助函式 ===
+        function renderData(data) {
+            // 渲染學生
+            const tbody = document.getElementById('student-tbody');
+            tbody.innerHTML = '';
+            if (data.students && data.students.length > 0) {
+                data.students.forEach(st => addStudentRow(st.no, st.name));
+            } else {
+                addStudentRow('', '');
+            }
+
+            // 渲染作業
+            document.getElementById('homework-content').value = data.homework || '';
+        }
+
+        // === 4. 動態增加學生列 ===
+        function addStudentRow(no = '', name = '') {
+            const tbody = document.getElementById('student-tbody');
+            const tr = document.createElement('tr');
+            tr.className = "student-row border-b border-gray-100 hover:bg-slate-50 transition";
+            tr.innerHTML = `
+                <td class="p-2 text-center">
+                    <input type="text" class="student-no w-12 text-center p-1 border rounded" value="${no}" placeholder="例: 1">
+                </td>
+                <td class="p-2">
+                    <input type="text" class="student-name w-full p-1 border rounded focus:ring-1 focus:ring-indigo-500" value="${name}" placeholder="請輸入學生姓名">
+                </td>
+                <td class="p-2 text-center">
+                    <button onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 font-medium text-sm cursor-pointer">刪除</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    </script>
+</body>
+</html>
