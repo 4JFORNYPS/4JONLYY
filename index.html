@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧班級聯絡簿與試算表雲端訂正系統</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
+        .container { max-width: 950px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+        
+        .tab-navigation { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .tab-btn { padding: 10px 18px; border: 1px solid #ccc; background: #e0e0e0; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 14px; }
+        .tab-btn.active { background: #3498db; color: white; border-color: #3498db; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px dashed #eee; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], input[type="number"], input[type="date"], textarea, select { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 14px; }
+        button:hover { background-color: #2980b9; }
+        .btn-success { background-color: #27ae60; }
+        .btn-success:hover { background-color: #219653; }
+        .btn-danger { background-color: #e74c3c; padding: 5px 10px; font-size: 12px; }
+        .btn-danger:hover { background-color: #c0392b; }
+        
+        .flex-group { display: flex; gap: 10px; align-items: flex-end; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+
+        .hw-row { display: flex; gap: 10px; align-items: center; background: #f9f9f9; padding: 10px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; }
+        .hw-row.completed { background-color: #eaeaea; color: #888; border-color: #ccc; }
+        
+        .week-calendar-container { display: flex; gap: 15px; margin-top: 10px; background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; }
+        .day-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 65px; height: 65px; border-radius: 50%; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; color: white; border: 2px solid transparent; cursor: pointer; transition: transform 0.1s; }
+        .day-badge.selected-day { border: 3px solid #000 !important; transform: scale(1.05); }
+        .day-date-text { font-size: 10px; opacity: 0.9; margin-top: 2px; }
+        
+        .bg-status-green { background-color: #27ae60; color: white; }
+        .bg-status-yellow { background-color: #f1c40f; color: #333; }
+        .bg-status-gray { background-color: #95a5a6; color: white; }
+        
+        .sub-tab-navigation { display: flex; gap: 5px; margin: 15px 0; background: #eee; padding: 5px; border-radius: 6px; }
+        .sub-tab-btn { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; font-weight: bold; border-radius: 4px; color: #555; font-size: 14px; margin-top: 0; }
+        .sub-tab-btn.active { background: white; color: #2c3e50; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .hw-correction-block { background: #fff; border: 1px solid #dcdcdc; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+        .hw-correction-title { font-weight: bold; font-size: 15px; color: #2c3e50; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .list-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .list-item-btn { padding: 6px 12px; font-weight: bold; border-radius: 20px; border: 2px solid #e74c3c; background-color: #fcebe9; color: #e74c3c; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+        .list-item-btn.corrected { background-color: #ebf7ee; border-color: #27ae60; color: #27ae60; }
+        
+        .copy-area-box { background: #ffffff; color: #111111; padding: 25px; border: 3px solid #3498db; border-radius: 8px; position: relative; }
+        .copy-area-box:fullscreen { padding: 40px; border-radius: 0; background: #ffffff; overflow-y: auto; }
+        .copy-title { font-size: 32px; color: #2c3e50; font-weight: bold; margin-bottom: 20px; text-align: center; border-bottom: 3px dashed #3498db; padding-bottom: 15px; }
+        .copy-section-title { font-size: 24px; color: #16a085; margin-top: 20px; margin-bottom: 10px; font-weight: bold; }
+        .copy-content-text { font-size: 26px; color: #222222; line-height: 1.8; white-space: pre-line; background: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 8px solid #16a085; font-weight: bold; }
+        .fullscreen-btn { position: absolute; top: 15px; right: 15px; background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        
+        .preview-card { background: #fff9e6; padding: 15px; border-left: 5px solid #f39c12; border-radius: 4px; white-space: pre-line; font-size: 15px; }
+        .tag { display: inline-block; background: #e1f5fe; color: #0288d1; padding: 5px 10px; border-radius: 4px; margin: 3px; font-size: 13px; font-weight: bold; border: 1px solid #b3e5fc; }
+        .tag-type { font-size: 11px; background: #0288d1; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 5px; }
+
+        .parent-student-selector { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; background: #edf2f7; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e0; }
+        .parent-student-btn { padding: 8px 14px; font-weight: bold; border: 2px solid #4a5568; background-color: white; color: #4a5568; border-radius: 6px; cursor: pointer; font-size: 15px; }
+        .parent-student-btn.active { background-color: #3182ce; border-color: #2b6cb0; color: white; }
+        .cloud-sync-badge { font-size: 12px; color: #27ae60; font-weight: bold; background: #e8f8f0; padding: 4px 8px; border-radius: 4px; border: 1px solid #27ae60; display: inline-block; margin-left: 10px; }
+        .loading-cover { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:bold; color:#2c3e50; z-index:9999; }
+    </style>
+</head>
+<body>
+
+<div id="loadingView" class="loading-cover">⏳ 正在與 Google 試算表同步資料中，請稍候...</div>
+
+<div class="container">
+    <h1 id="mainTitle">📝 班級聯絡簿試算表雲端系統 <span class="cloud-sync-badge">🟢 Google 試算表已連線</span></h1>
+
+    <div class="tab-navigation" id="tabBar">
+        <button class="tab-btn active" onclick="switchTab('teacher-view', this)">🔒 老師管理後台</button>
+        <button class="tab-btn" onclick="switchTab('student-copy-view', this)">✍️ 回家作業區 (投影用)</button>
+        <button class="tab-btn" onclick="switchTab('parent-view', this)">👀 家長/學生查看頁</button>
+    </div>
+
+    <div id="teacher-view" class="tab-content active">
+        <div class="section">
+            <h2>👥 學生名冊設定</h2>
+            <table id="studentTable">
+                <thead><tr><th>座號</th><th>姓名</th><th>操作</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <button onclick="addStudentRow('', '')">➕ 增加學生欄位</button>
+            <button class="btn-success" onclick="saveDataToCloud()">💾 儲存並將所有設定上傳至 Google 試算表</button>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ 自訂作業類別與預設樣式</h2>
+            <div class="flex-group">
+                <div style="flex: 2;"><input type="text" id="newCategoryInput" placeholder="類別名稱，如：國語習作" style="margin-top:0;"></div>
+                <div style="flex: 1;">
+                    <select id="newCategoryType" style="margin-top:0;">
+                        <option value="頁數">頁數型</option>
+                        <option value="回數">回數型</option>
+                        <option value="自訂">自訂型</option>
+                    </select>
+                </div>
+                <button class="btn-success" onclick="addNewCategory()" style="margin-top:0; height: 38px;">➕ 新增類別</button>
+            </div>
+            <div id="categoriesTagsContainer" style="margin-top: 12px;"></div>
+        </div>
+
+        <div class="section">
+            <h2>📅 今日作業設定</h2>
+            <div class="flex-group" style="margin-bottom: 15px; background: #e8f4fd; padding: 15px; border-radius: 6px; flex-wrap: wrap;">
+                <div style="width: 220px;">
+                    <label style="margin-top:0; color:#2980b9;">🚀 設定第一週(一)日期：</label>
+                    <input type="date" id="firstWeekMondayDate" onchange="handleFirstWeekDateChange()" style="font-weight: bold; border-color: #3498db;">
+                </div>
+                <div style="width: 150px;">
+                    <label style="margin-top:0;">切換教學週次：</label>
+                    <select id="schoolWeekSelect" onchange="handleWeekChange()"></select>
+                </div>
+                <div style="width: 180px;">
+                    <label style="margin-top:0;">選擇具體日期：</label>
+                    <input type="date" id="todayDate" onchange="handleDateChange()">
+                </div>
+                <div><span id="dateStatusIndicator" style="font-weight: bold; font-size: 14px;"></span></div>
+            </div>
+
+            <div style="background: #f0f4f8; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <strong id="weekSummaryTitle">📅 出題排程狀態總覽：</strong>
+                <div class="week-calendar-container" id="calendarStatusSummary"></div>
+            </div>
+
+            <div id="homeworkContainer"></div>
+            <button onclick="addHomeworkRow()">➕ 新增一項作業項目</button>
+            <br><button class="btn-success" style="width:100%; padding:12px; margin-top:15px; font-size:16px;" onclick="saveDataToCloud()">💾 儲存今日出題進度至試算表</button>
+        </div>
+
+        <div class="section">
+            <h2>🔍 登記未交 / 未訂正人員</h2>
+            <div style="background: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <strong style="color: #856404;" id="correctionWeekTitle">📅 學生未訂正狀態總覽：</strong>
+                    <select id="correctionWeekSelect" onchange="handleCorrectionWeekSelectChange()" style="margin-top: 0; width: 140px; padding:5px;"></select>
+                </div>
+                <div class="week-calendar-container" id="correctionCalendarSummary"></div>
+            </div>
+            
+            <div class="sub-tab-navigation">
+                <button class="sub-tab-btn active" id="subTabPastBtn" onclick="switchSubCorrectionTab('past')">1️⃣ 已出過作業區 (昨天以前)</button>
+                <button class="sub-tab-btn" id="subTabFutureBtn" onclick="switchSubCorrectionTab('future')">2️⃣ 今天與未來作業區</button>
+            </div>
+
+            <div id="correctionPanelsContainer"></div>
+        </div>
+    </div>
+
+    <div id="student-copy-view" class="tab-content">
+        <div class="copy-area-box" id="fullscreenTarget">
+            <button class="fullscreen-btn" onclick="toggleFullscreen()">🖥️ 全螢幕模式</button>
+            <div class="copy-title" id="copyAreaTitle">🔔 今日回家作業與提醒 🔔</div>
+            <div class="copy-section-title">📌 聯絡簿作業內容：</div>
+            <div class="copy-content-text" id="studentCopyHomeworkText">（今日尚無排定作業）</div>
+        </div>
+    </div>
+
+    <div id="parent-view" class="tab-content">
+        <div id="parentFullContent">
+            <h2>📋 今日聯絡簿最新公告</h2>
+            <div id="previewBox" class="preview-card"></div>
+            <button class="btn-success" style="width: 100%; padding: 12px; margin-top: 15px; font-size: 16px;" onclick="copyToClipboard()">📋 一鍵複製聯絡簿文字 (方便貼至 LINE)</button>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
+        </div>
+        
+        <div style="background: #fff5f5; border: 2px solid #ffcdd2; padding: 20px; border-radius: 8px;">
+            <h2 style="color: #c62828; margin-top: 0; border-bottom-color: #ffcdd2;">⚠️ 各項作業「未完成 / 未訂正」名單 (不含今日)</h2>
+            <div style="font-size: 14px; font-weight: bold; color: #4a5568; margin-bottom: 5px;">📍 請點擊您的孩子座號，可單獨篩選該生的未訂正作業：</div>
+            <div class="parent-student-selector" id="parentStudentButtonsContainer"></div>
+            <div id="parentOnlyUnsubmittedBox" style="font-size: 20px; color: #d32f2f; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ffecb3; text-align: left; line-height: 1.6; white-space: pre-line;">
+                🎉 恭喜！全班各項作業皆已全數訂正完成！
+            </div>
+        </div>
+        <button id="copyParentUrlBtn" class="btn-success" style="background-color: #8e44ad; width: 100%; padding: 12px; margin-top: 15px; font-size: 15px;" onclick="copyParentIndependentUrl()">🔗 一鍵複製「家長專用獨立看未訂正網址」</button>
+    </div>
+</div>
+
+<script>
+    // ======= ⚠️ 貼上妳在步驟二部署得到的 Google Apps Script 網址 =======
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwdROGNRV6FjsEGBgcgL36tkupEEldOgyuiamwh_fzgkvxv4hm72ExQpNs5Xb-vin_plw/exec";
+    // ===================================================================
+
+    let studentList = [{seat: "1", name: "林小明"}, {seat: "2", name: "陳大同"}, {seat: "3", name: "張美麗"}];
+    let customCategories = [{name: "國語習作", type: "頁數"}, {name: "數學重點", type: "回數"}, {name: "生活叮嚀", type: "自訂"}];
+    let homeworkDatabase = {};
+    let firstWeekMondayDate = "2026-02-09";
+
+    let currentCorrectionTab = 'past'; 
+    let selectedCorrectionDate = ""; 
+    let parentSelectedSeat = ""; 
+
+    window.onload = function() {
+        const weekSelect = document.getElementById("schoolWeekSelect");
+        const correctionWeekSelect = document.getElementById("correctionWeekSelect");
+        for(let i=1; i<=22; i++) {
+            let opt1 = document.createElement("option"); opt1.value = `第 ${i} 週`; opt1.innerText = `第 ${i} 週`;
+            weekSelect.appendChild(opt1);
+            let opt2 = document.createElement("option"); opt2.value = `第 ${i} 週`; opt2.innerText = `第 ${i} 週`;
+            correctionWeekSelect.appendChild(opt2);
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('todayDate').value = today;
+
+        // 從試算表拉取最新全班資料
+        fetch(`${GAS_WEB_APP_URL}?action=loadAll`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.studentList && data.studentList.length > 0) studentList = data.studentList;
+            if (data.customCategories && data.customCategories.length > 0) customCategories = data.customCategories;
+            if (data.homeworkDatabase) homeworkDatabase = data.homeworkDatabase;
+            if (data.firstWeekMondayDate) firstWeekMondayDate = data.firstWeekMondayDate;
+            
+            document.getElementById("firstWeekMondayDate").value = firstWeekMondayDate;
+            let calculatedWeek = calculateWeekFromDate(today);
+            document.getElementById("schoolWeekSelect").value = calculatedWeek;
+            document.getElementById("correctionWeekSelect").value = calculatedWeek;
+
+            renderStudentTable(studentList);
+            renderParentStudentSelector();
+            renderCategoryTags();
+            loadTodayHomeworkFromDB();
+            
+            document.getElementById("loadingView").style.display = "none";
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            if(urlParams.get('role') === 'parent') {
+                document.getElementById("tabBar").style.display = "none";
+                document.getElementById("teacher-view").style.display = "none";
+                document.getElementById("student-copy-view").style.display = "none";
+                document.getElementById("parentFullContent").style.display = "none";
+                document.getElementById("copyParentUrlBtn").style.display = "none";
+                document.getElementById("mainTitle").innerHTML = "🏫 班級作業未訂正公告板 <span class='cloud-sync-badge'>🟢 即時連線中</span>";
+                switchTab('parent-view', null);
+            } else {
+                updateAll();
+            }
+        }).catch(err => {
+            alert("❌ 無法與 Google 試算表連線，請確認 API 網址是否正確，且權限是否開為所有人。");
+            document.getElementById("loadingView").innerText = "❌ 連線失敗，請檢查設定。";
+        });
+    };
+
+    // 把目前的網頁狀態打包，一口氣存入試算表
+    function saveDataToCloud() {
+        document.getElementById("loadingView").innerText = "📤 正在將異動儲存至雲端試算表...";
+        document.getElementById("loadingView").style.display = "flex";
+
+        // 同步名冊表格內文字
+        const rows = document.querySelectorAll("#studentTable tbody tr");
+        const studentArray = [];
+        rows.forEach(row => {
+            const seat = row.querySelector(".seat-no").value;
+            const name = row.querySelector(".student-name").value;
+            if(seat && name) studentArray.push({seat: seat, name: name});
+        });
+        if(studentArray.length > 0) studentList = studentArray;
+
+        syncCurrentRowsToDatabase();
+
+        const payload = {
+          action: "saveAll",
+          firstWeekMondayDate: document.getElementById("firstWeekMondayDate").value,
+          studentList: studentList,
+          customCategories: customCategories,
+          homeworkDatabase: homeworkDatabase
+        };
+
+        fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(res => {
+            document.getElementById("loadingView").style.display = "none";
+            if(res.status === "success") {
+                alert("✨ 所有資料均已成功保存至雲端 Google 試算表！不論換什麼載具都不會遺失了！");
+                renderParentStudentSelector();
+                updateAll();
+            } else {
+                alert("儲存失敗: " + res.message);
+            }
+        }).catch(err => {
+            document.getElementById("loadingView").style.display = "none";
+            alert("連線錯誤，儲存失敗。");
+        });
+    }
+
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        if(btnElement) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+        document.getElementById(tabId).classList.add('active');
+        updateAll();
+    }
+
+    function switchSubCorrectionTab(mode) {
+        currentCorrectionTab = mode;
+        document.getElementById('subTabPastBtn').classList.remove('active');
+        document.getElementById('subTabFutureBtn').classList.remove('active');
+        if(mode === 'past') document.getElementById('subTabPastBtn').classList.add('active');
+        else document.getElementById('subTabFutureBtn').classList.add('active');
+        renderCorrectionPanels();
+    }
+
+    function handleFirstWeekDateChange() {
+        firstWeekMondayDate = document.getElementById("firstWeekMondayDate").value;
+        let targetWeek = calculateWeekFromDate(document.getElementById('todayDate').value);
+        document.getElementById("schoolWeekSelect").value = targetWeek;
+        document.getElementById("correctionWeekSelect").value = targetWeek;
+        updateAll();
+    }
+
+    function calculateWeekFromDate(dateStr) {
+        if(!firstWeekMondayDate) return "第 1 週";
+        const firstDate = new Date(firstWeekMondayDate);
+        const targetDate = new Date(dateStr);
+        const diffTime = targetDate.getTime() - firstDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        if(diffDays < 0) return "第 1 週";
+        let weekNum = Math.floor(diffDays / 7) + 1;
+        return `第 ${weekNum > 22 ? 22 : weekNum} 週`;
+    }
+
+    function getMondayOfWeek(weekStr) {
+        if(!firstWeekMondayDate) return new Date();
+        let weekNum = parseInt(weekStr.replace(/[^0-9]/g, '')) || 1;
+        let d = new Date(firstWeekMondayDate);
+        d.setDate(d.getDate() + (weekNum - 1) * 7);
+        return d;
+    }
+
+    function renderStudentTable(students) {
+        const tableBody = document.querySelector("#studentTable tbody");
+        if(!tableBody) return; tableBody.innerHTML = "";
+        students.forEach(s => {
+            const newRow = document.createElement("tr");
+            newRow.innerHTML = `<td><input type="number" value="${s.seat}" class="seat-no"></td><td><input type="text" value="${s.name}" class="student-name"></td><td><button class="btn-danger" onclick="this.closest('tr').remove();">刪除</button></td>`;
+            tableBody.appendChild(newRow);
+        });
+    }
+    
+    function addStudentRow(seat, name) {
+        const tableBody = document.querySelector("#studentTable tbody");
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `<td><input type="number" value="${seat}" class="seat-no"></td><td><input type="text" value="${name}" class="student-name"></td><td><button class="btn-danger" onclick="this.closest('tr').remove();">刪除</button></td>`;
+        tableBody.appendChild(newRow);
+    }
+
+    function getStudentMap() {
+        const studentMap = {};
+        studentList.forEach(s => { if(s.seat && s.name) studentMap[s.seat] = s.name; });
+        return Object.keys(studentMap).length > 0 ? studentMap : { "1": "林小明", "2": "陳大同" };
+    }
+
+    function renderParentStudentSelector() {
+        const container = document.getElementById("parentStudentButtonsContainer");
+        if(!container) return; container.innerHTML = "";
+        const students = getStudentMap();
+
+        const allBtn = document.createElement("button");
+        allBtn.className = `parent-student-btn ${parentSelectedSeat === "" ? "active" : ""}`;
+        allBtn.innerText = "顯示全班名單";
+        allBtn.onclick = function() { parentSelectedSeat = ""; updateAll(); renderParentStudentSelector(); };
+        container.appendChild(allBtn);
+
+        Object.keys(students).sort((a,b)=>a-b).forEach(seat => {
+            const btn = document.createElement("button");
+            btn.className = `parent-student-btn ${parentSelectedSeat === seat ? "active" : ""}`;
+            btn.innerText = `${seat}號 ${students[seat]}`;
+            btn.onclick = function() {
+                parentSelectedSeat = (parentSelectedSeat === seat) ? "" : seat;
+                renderParentStudentSelector(); updateAll();
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    function renderCategoryTags() {
+        const container = document.getElementById("categoriesTagsContainer");
+        if(!container) return; container.innerHTML = "";
+        customCategories.forEach((cat, index) => {
+            const span = document.createElement("span"); span.className = "tag";
+            span.innerHTML = `${cat.name}<span class="tag-type">${cat.type}</span><span style="cursor:pointer;color:#e74c3c;margin-left:8px;" onclick="deleteCategory(${index})">×</span>`;
+            container.appendChild(span);
+        });
+        document.querySelectorAll(".hw-subject").forEach(select => refreshSelectOptions(select, select.value));
+    }
+    
+    function addNewCategory() {
+        const name = document.getElementById("newCategoryInput").value.trim();
+        const type = document.getElementById("newCategoryType").value;
+        if(name && !customCategories.some(c => c.name === name)) {
+            customCategories.push({name: name, type: type});
+            document.getElementById("newCategoryInput").value = "";
+            renderCategoryTags();
+        }
+    }
+    
+    function deleteCategory(index) {
+        customCategories.splice(index, 1); renderCategoryTags();
+    }
+    
+    function refreshSelectOptions(selectElement, targetVal) {
+        selectElement.innerHTML = "";
+        customCategories.forEach(cat => {
+            const opt = document.createElement("option"); opt.value = cat.name; opt.innerText = cat.name;
+            if(cat.name === targetVal) opt.selected = true;
+            selectElement.appendChild(opt);
+        });
+    }
+
+    function addHomeworkRow(existingHw = null) {
+        const container = document.getElementById("homeworkContainer");
+        if(!container) return;
+        const rowId = existingHw ? existingHw.rowId : "hw-" + Date.now();
+        const div = document.createElement("div"); div.className = "hw-row"; div.id = rowId;
+        
+        let optionsHtml = ""; 
+        customCategories.forEach(cat => { 
+            const selected = existingHw && existingHw.subject === cat.name ? "selected" : "";
+            optionsHtml += `<option value="${cat.name}" ${selected}>${cat.name}</option>`; 
+        });
+
+        div.innerHTML = `
+            <select class="hw-subject" style="width: 140px;" onchange="handleSubjectChange('${rowId}')">${optionsHtml}</select>
+            <div class="hw-input-area" style="flex: 1; display: flex; gap: 5px; align-items: center;"></div>
+            <label style="margin:0; font-size:13px; white-space:nowrap;"><input type="checkbox" class="hw-status" onchange="toggleRowGray('${rowId}')" ${existingHw && existingHw.isDone ? 'checked' : ''}>已完成</label>
+            <button class="btn-danger" style="margin:0;" onclick="removeHomeworkRow('${rowId}')">❌</button>
+        `;
+        container.appendChild(div);
+        
+        if (existingHw) restoreHomeworkInputs(rowId, existingHw);
+        else handleSubjectChange(rowId);
+    }
+
+    function removeHomeworkRow(rowId) { document.getElementById(rowId).remove(); }
+
+    function handleSubjectChange(rowId) {
+        const row = document.getElementById(rowId);
+        const subject = row.querySelector(".hw-subject").value;
+        const inputArea = row.querySelector(".hw-input-area");
+        const matched = customCategories.find(c => c.name === subject);
+        const type = matched ? matched.type : "自訂";
+        
+        if (type === "頁數") {
+            inputArea.innerHTML = `<span class="prefix-text">第</span><input type="number" class="hw-val1" style="width:55px;" onchange="validateAndSync('${rowId}')"><span class="middle-text">至</span><input type="number" class="hw-val2" style="width:55px;" onchange="validateAndSync('${rowId}')"><span class="suffix-text">頁</span>`;
+        } else if (type === "回數") {
+            inputArea.innerHTML = `<span class="prefix-text">第</span><input type="number" class="hw-val1" style="width:55px;" onchange="validateAndSync('${rowId}')"><span class="suffix-text">回</span>`;
+        } else {
+            inputArea.innerHTML = `<input type="text" class="hw-val1" placeholder="輸入自訂內容..." onchange="validateAndSync('${rowId}')">`;
+        }
+        row.setAttribute("data-type", type);
+    }
+
+    function restoreHomeworkInputs(rowId, existingHw) {
+        const row = document.getElementById(rowId);
+        const inputArea = row.querySelector(".hw-input-area");
+        row.setAttribute("data-type", existingHw.type);
+        if (existingHw.type === "頁數") {
+            inputArea.innerHTML = `<span class="prefix-text">第</span><input type="number" class="hw-val1" style="width:55px;" value="${existingHw.val1}" onchange="validateAndSync('${rowId}')"><span class="middle-text">至</span><input type="number" class="hw-val2" style="width:55px;" value="${existingHw.val2}" onchange="validateAndSync('${rowId}')"><span class="suffix-text">頁</span>`;
+        } else if (existingHw.type === "回數") {
+            inputArea.innerHTML = `<span class="prefix-text">第</span><input type="number" class="hw-val1" style="width:55px;" value="${existingHw.val1}" onchange="validateAndSync('${rowId}')"><span class="suffix-text">回</span>`;
+        } else {
+            inputArea.innerHTML = `<input type="text" class="hw-val1" value="${existingHw.val1}" onchange="validateAndSync('${rowId}')">`;
+        }
+        if(existingHw.isDone) row.classList.add('completed');
+    }
+
+    function toggleRowGray(rowId) {
+        const row = document.getElementById(rowId);
+        if (row.querySelector('.hw-status').checked) row.classList.add('completed');
+        else row.classList.remove('completed');
+    }
+
+    function validateAndSync(rowId) {
+        const row = document.getElementById(rowId);
+        const subject = row.querySelector(".hw-subject").value;
+        const type = row.getAttribute("data-type");
+        const val1 = row.querySelector(".hw-val1") ? row.querySelector(".hw-val1").value.trim() : "";
+        const val2 = row.querySelector(".hw-val2") ? row.querySelector(".hw-val2").value.trim() : "";
+        const today = document.getElementById("todayDate").value;
+
+        if (!val1) return;
+        let hasOverlap = false; let overlapDetails = ""; let overlapDate = "";
+
+        Object.keys(homeworkDatabase).forEach(key => {
+            let hw = homeworkDatabase[key];
+            if (hw.date !== today && hw.subject === subject && hw.type === type) {
+                if (type === "頁數") {
+                    let newStart = parseInt(val1); let newEnd = val2 ? parseInt(val2) : newStart;
+                    let oldStart = parseInt(hw.val1); let oldEnd = hw.val2 ? parseInt(hw.val2) : oldStart;
+                    if (newStart <= oldEnd && newEnd >= oldStart) { hasOverlap = true; overlapDate = hw.date; overlapDetails = hw.val2 ? `第 ${hw.val1} 至 ${hw.val2} 頁` : `第 ${hw.val1} 頁`; }
+                } else if (type === "回數") {
+                    if (parseInt(val1) === parseInt(hw.val1)) { hasOverlap = true; overlapDate = hw.date; overlapDetails = `第 ${hw.val1} 回`; }
+                } else {
+                    if (val1 === hw.val1) { hasOverlap = true; overlapDate = hw.date; overlapDetails = hw.val1; }
+                }
+            }
+        });
+
+        if (hasOverlap) {
+            alert(`⚠️ 範圍重複警告！\n【${subject}】進度與 ${overlapDate} 出過的「${overlapDetails}」重複！請重新確認。`);
+            if(row.querySelector(".hw-val1")) row.querySelector(".hw-val1").value = "";
+            if(row.querySelector(".hw-val2")) row.querySelector(".hw-val2").value = "";
+        }
+    }
+
+    function syncCurrentRowsToDatabase() {
+        const today = document.getElementById("todayDate").value;
+        const week = document.getElementById("schoolWeekSelect").value;
+        const students = getStudentMap();
+        
+        let tempDb = {};
+        Object.keys(homeworkDatabase).forEach(key => {
+            if (homeworkDatabase[key].date !== today) tempDb[key] = homeworkDatabase[key];
+        });
+
+        const rows = document.querySelectorAll('.hw-row');
+        rows.forEach(row => {
+            const subject = row.querySelector('.hw-subject').value;
+            const type = row.getAttribute("data-type");
+            const isDone = row.querySelector('.hw-status').checked;
+            const val1 = row.querySelector('.hw-val1') ? row.querySelector('.hw-val1').value.trim() : "";
+            const val2 = row.querySelector('.hw-val2') ? row.querySelector('.hw-val2').value.trim() : "";
+
+            if (val1) {
+                const cleanKey = `${today}_${subject}_${val1}_${val2}`.replace(/[\.\#\$\[\]\,\=\:\/]/g, "-");
+                let existingUnsubmitted = (homeworkDatabase[cleanKey] && homeworkDatabase[cleanKey].unsubmitted) 
+                    ? homeworkDatabase[cleanKey].unsubmitted 
+                    : Object.keys(students);
+
+                tempDb[cleanKey] = {
+                    date: today, week: week, subject: subject, type: type,
+                    val1: val1, val2: val2, isDone: isDone, unsubmitted: existingUnsubmitted
+                };
+            }
+        });
+        homeworkDatabase = tempDb;
+    }
+
+    function loadTodayHomeworkFromDB() {
+        const today = document.getElementById("todayDate").value;
+        const container = document.getElementById("homeworkContainer");
+        if(!container) return; container.innerHTML = "";
+        
+        let hasData = false;
+        Object.keys(homeworkDatabase).forEach(key => {
+            if(homeworkDatabase[key].date === today) {
+                addHomeworkRow({
+                    rowId: "hw-" + Math.random().toString(36).substr(2, 9),
+                    subject: homeworkDatabase[key].subject,
+                    type: homeworkDatabase[key].type,
+                    val1: homeworkDatabase[key].val1,
+                    val2: homeworkDatabase[key].val2,
+                    isDone: homeworkDatabase[key].isDone
+                });
+                hasData = true;
+            }
+        });
+        if(!hasData) addHomeworkRow();
+    }
+
+    function renderCorrectionPanels() {
+        const container = document.getElementById("correctionPanelsContainer");
+        if(!container) return; container.innerHTML = "";
+        const students = getStudentMap();
+        const realTodayStr = new Date().toISOString().split('T')[0];
+        const targetCorrectionWeek = document.getElementById("correctionWeekSelect").value;
+
+        const sortedKeys = Object.keys(homeworkDatabase).sort((a,b) => new Date(homeworkDatabase[b].date) - new Date(homeworkDatabase[a].date));
+        let displayedCount = 0;
