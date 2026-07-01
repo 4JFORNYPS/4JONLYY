@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級日常聯絡簿與座號訂正系統 (GitHub 記憶版)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+        .section { margin-bottom: 30px; padding-bottom: 20px; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], input[type="number"], textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 120px; }
+        button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 14px; }
+        button:hover { background-color: #2980b9; }
+        .btn-success { background-color: #27ae60; }
+        .btn-success:hover { background-color: #219653; }
+        .btn-danger { background-color: #e74c3c; padding: 5px 10px; font-size: 12px; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .flex-group { display: flex; gap: 10px; }
+        .error-msg { color: #e74c3c; font-weight: bold; margin-top: 5px; display: block; }
+        .success-msg { color: #27ae60; font-weight: bold; margin-top: 5px; display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 班級日常管理系統 (自動記憶版)</h1>
+
+    <div class="section">
+        <h2>👥 1. 學生名冊設定</h2>
+        <p style="font-size: 0.9em; color: #666;">修改後系統會「自動儲存」，下次打開不需重新輸入。</p>
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th>座號</th>
+                    <th>姓名</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+        <button onclick="addStudentRow('', '')">➕ 增加學生欄位</button>
+        <button class="btn-success" onclick="saveStudentList()">💾 儲存名冊架構</button>
+    </div>
+
+    <div class="section">
+        <h2>📅 2. 今日聯絡簿內容</h2>
+        <label>今日日期：</label>
+        <input type="text" id="todayDate">
+        
+        <label>今日作業與帶辦事項：</label>
+        <textarea id="homeworkContent" placeholder="1. 國語習作第五課&#10;2. 數學附件 P.12" oninput="updatePreview()"></textarea>
+    </div>
+
+    <div class="section">
+        <h2>🔍 3. 登記未交/需訂正人員 (座號自動比對)</h2>
+        <div class="flex-group">
+            <div style="flex: 1;">
+                <label>輸入學生座號：</label>
+                <input type="number" id="inputSeat" placeholder="例如：1" oninput="checkAndCorrectSeat()">
+            </div>
+            <div style="flex: 1;">
+                <label>系統自動對應姓名：</label>
+                <input type="text" id="resultName" readonly style="background-color: #eee;" placeholder="自動對應中...">
+            </div>
+        </div>
+        <div id="verifyMessage"></div>
+        <button onclick="logRecord()">定位登記 📌 紀錄此人</button>
+        <button class="btn-danger" style="background-color: #7f8c8d;" onclick="clearRecords()">🔄 重設今日名單</button>
+    </div>
+
+    <div class="section" style="border-bottom: none;">
+        <h2>📋 4. 今日發布預覽</h2>
+        <div id="previewBox" style="background: #fff9e6; padding: 15px; border-left: 5px solid #f39c12; border-radius: 4px; white-space: pre-line; font-family: monospace;">
+        </div>
+        <button class="btn-success" style="width: 100%; padding: 12px; margin-top: 15px; font-size: 16px;" onclick="copyToClipboard()">📋 一鍵複製文字 (可直接貼到 LINE 班群)</button>
+    </div>
+</div>
+
+<script>
+    // 預設名冊（如果瀏覽器完全沒資料時才會啟用）
+    const defaultStudents = [
+        {seat: "1", name: "林小明"},
+        {seat: "2", name: "陳大同"},
+        {seat: "3", name: "張美麗"}
+    ];
+
+    // 初始化網頁
+    window.onload = function() {
+        // 設定今日日期
+        const today = new Date();
+        document.getElementById('todayDate').value = today.toISOString().split('T')[0];
+
+        // 讀取原本存好的名冊
+        let storedStudents = localStorage.getItem("studentList");
+        if (storedStudents) {
+            storedStudents = JSON.parse(storedStudents);
+        } else {
+            storedStudents = defaultStudents;
+        }
+
+        // 將名冊渲染到表格中
+        storedStudents.forEach(s => addStudentRow(s.seat, s.name));
+        
+        // 讀取上次寫到一半的聯絡簿
+        document.getElementById("homeworkContent").value = localStorage.getItem("lastHomework") || "";
+        
+        updatePreview();
+    };
+
+    // 動態增加表格列
+    function addStudentRow(seat, name) {
+        const tableBody = document.querySelector("#studentTable tbody");
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `
+            <td><input type="number" value="${seat}" class="seat-no"></td>
+            <td><input type="text" value="${name}" placeholder="姓名" class="student-name"></td>
+            <td><button class="btn-danger" onclick="this.closest('tr').remove()">刪除</button></td>
+        `;
+        tableBody.appendChild(newRow);
+    }
+
+    // 儲存名冊到瀏覽器記憶體
+    function saveStudentList() {
+        const rows = document.querySelectorAll("#studentTable tbody tr");
+        const studentArray = [];
+        rows.forEach(row => {
+            const seat = row.querySelector(".seat-no").value;
+            const name = row.querySelector(".student-name").value;
+            if(seat && name) {
+                studentArray.push({seat: seat, name: name});
+            }
+        });
+        localStorage.setItem("studentList", JSON.stringify(studentArray));
+        alert("💾 名冊已成功儲存到此瀏覽器！");
+        checkAndCorrectSeat();
+    }
+
+    // 獲取目前的名冊物件
+    function getStudentMap() {
+        const rows = document.querySelectorAll("#studentTable tbody tr");
+        const studentMap = {};
+        rows.forEach(row => {
+            const seat = row.querySelector(".seat-no").value;
+            const name = row.querySelector(".student-name").value;
+            if(seat && name) studentMap[seat] = name;
+        });
+        return studentMap;
+    }
+
+    // 核心邏輯：即時對應與訂正座號
+    function checkAndCorrectSeat() {
+        const inputSeat = document.getElementById("inputSeat").value;
+        const resultNameInput = document.getElementById("resultName");
+        const msgDiv = document.getElementById("verifyMessage");
+        const students = getStudentMap();
+        
+        if (!inputSeat) {
+            resultNameInput.value = "";
+            msgDiv.innerHTML = "";
+            return;
+        }
+
+        if (students[inputSeat]) {
+            resultNameInput.value = students[inputSeat];
+            msgDiv.innerHTML = `<span class="success-msg">✓ 自動對應成功：${inputSeat}號是【${students[inputSeat]}】</span>`;
+        } else {
+            resultNameInput.value = "";
+            msgDiv.innerHTML = `<span class="error-msg">⚠ 警告：找不到 ${inputSeat} 號！請確認座號是否打錯。</span>`;
+        }
+    }
+
+    // 紀錄未交人員
+    let recordList = [];
+    function logRecord() {
+        const seat = document.getElementById("inputSeat").value;
+        const name = document.getElementById("resultName").value;
+        if(!seat || !name) {
+            alert("請輸入有效的座號！");
+            return;
+        }
+        
+        const record = `${seat}號(${name})`;
+        if(!recordList.includes(record)) {
+            recordList.push(record);
+        }
+        
+        document.getElementById("inputSeat").value = "";
+        document.getElementById("resultName").value = "";
+        document.getElementById("verifyMessage").innerHTML = "";
+        updatePreview();
+    }
+
+    function clearRecords() {
+        recordList = [];
+        updatePreview();
+    }
+
+    // 更新總預覽並暫存文字
+    function updatePreview() {
+        const date = document.getElementById("todayDate").value;
+        const homework = document.getElementById("homeworkContent").value || "（無）";
+        const unsubmitted = recordList.length > 0 ? recordList.join(", ") : "全班皆已繳交/無訂正事項";
+        
+        localStorage.setItem("lastHomework", homework);
+
+        const previewText = `【班級聯絡簿】日期：${date}\n` +
+                            `------------------------------------------\n` +
+                            `📌 今日作業與重要事項：\n${homework}\n\n` +
+                            `⚠️ 未交/需訂正作業名單：\n${unsubmitted}`;
+        
+        document.getElementById("previewBox").innerText = previewText;
+    }
+
+    // 一鍵複製功能
+    function copyToClipboard() {
+        const text = document.getElementById("previewBox").innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("📋 複製成功！快去貼到 LINE 班級群組吧！");
+        }).catch(err => {
+            alert("複製失敗，請手動全選複製。");
+        });
+    }
+</script>
+
+</body>
+</html>
